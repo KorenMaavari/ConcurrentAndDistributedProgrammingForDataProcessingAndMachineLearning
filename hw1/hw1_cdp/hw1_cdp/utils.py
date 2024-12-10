@@ -12,7 +12,7 @@ def sigmoid(x):
      np.ndarray
          sigmoid of the input x
      """
-    raise NotImplementedError("To be implemented")
+    return 1 / (1 + np.exp(-x))
 
 
 def sigmoid_prime(x):
@@ -27,7 +27,8 @@ def sigmoid_prime(x):
              derivative of sigmoid of the input x
 
     """
-    raise NotImplementedError("To be implemented")
+    sig = sigmoid(x)
+    return sig * (1 - sig)
 
 
 def random_weights(sizes):
@@ -41,7 +42,8 @@ def random_weights(sizes):
          list of xavier initialized np arrays weight matrices
     """
 
-    raise NotImplementedError("To be implemented")
+    # Koren: return [xavier_initialization(sizes[i - 1], sizes[i]) for i in range(1, len(sizes))]
+    return [xavier_initialization(sizes[i], sizes[i + 1]) for i in range(len(sizes) - 1)]  # Koren: Maybe len(sizes) - 2
 
 
 def zeros_weights(sizes):
@@ -54,7 +56,9 @@ def zeros_weights(sizes):
          -------
          list of zero np arrays weight matrices
     """
-    raise NotImplementedError("To be implemented")
+
+    # return [np.zeros((sizes[i - 1], sizes[i])) for i in range(1, len(sizes))]
+    return [np.zeros((sizes[i], sizes[i + 1])) for i in range(len(sizes) - 1)]  # Koren: Maybe len(sizes) - 2
 
 
 def zeros_biases(sizes):
@@ -68,7 +72,8 @@ def zeros_biases(sizes):
          list of zero np arrays bias matrices
     """
 
-    raise NotImplementedError("To be implemented")
+    # Koren: return [np.zeros(size) for size in sizes[1:]]
+    return [np.zeros(sizes[i]) for i in range(1, len(sizes))]
 
 
 def create_batches(data, labels, batch_size):
@@ -84,7 +89,12 @@ def create_batches(data, labels, batch_size):
          list of tuples of (data batch of batch_size, labels batch of batch_size)
     """
 
-    raise NotImplementedError("To be implemented")
+    n = len(data)  # n = data.shape[0]
+    batches = [
+        (data[i:i + batch_size], labels[i:i + batch_size])
+        for i in range(0, n, batch_size)
+    ]
+    return batches
 
 
 def add_elementwise(list1, list2):
@@ -98,7 +108,7 @@ def add_elementwise(list1, list2):
          -------
          list of sum of each two elements by index
     """
-    raise NotImplementedError("To be implemented")
+    return [a + b for a, b in zip(list1, list2)]
 
 
 def xavier_initialization(m, n):
