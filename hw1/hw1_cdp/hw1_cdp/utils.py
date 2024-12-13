@@ -41,9 +41,7 @@ def random_weights(sizes):
          -------
          list of xavier initialized np arrays weight matrices
     """
-
-    # Koren: return [xavier_initialization(sizes[i - 1], sizes[i]) for i in range(1, len(sizes))]
-    return [xavier_initialization(sizes[i], sizes[i + 1]) for i in range(len(sizes) - 1)]  # Koren: Maybe len(sizes) - 2
+    return [xavier_initialization(sizes[i], sizes[i + 1]) for i in range(len(sizes) - 1)]  # Koren: Or range(len(sizes))
 
 
 def zeros_weights(sizes):
@@ -56,9 +54,7 @@ def zeros_weights(sizes):
          -------
          list of zero np arrays weight matrices
     """
-
-    # return [np.zeros((sizes[i - 1], sizes[i])) for i in range(1, len(sizes))]
-    return [np.zeros((sizes[i], sizes[i + 1])) for i in range(len(sizes) - 1)]  # Koren: Maybe len(sizes) - 2
+    return [np.zeros((sizes[i], sizes[i + 1])) for i in range(len(sizes) - 1)]  # Koren: Maybe range of len(sizes)
 
 
 def zeros_biases(sizes):
@@ -72,8 +68,8 @@ def zeros_biases(sizes):
          list of zero np arrays bias matrices
     """
 
-    # Koren: return [np.zeros(size) for size in sizes[1:]]
-    return [np.zeros(sizes[i]) for i in range(1, len(sizes))]
+    # return [np.zeros(size) for size in sizes[1:]]
+    return [np.zeros(sizes[i]) for i in range(1, len(sizes))]  # Koren: Maybe range(1, len(sizes) + 1)
 
 
 def create_batches(data, labels, batch_size):
