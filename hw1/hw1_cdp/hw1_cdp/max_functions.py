@@ -10,16 +10,14 @@ def max_cpu(A, B):
      np.array
          element-wise maximum between A and B
      """
-    # Koren: return np.array([[max(a, b) for a, b in zip(A_row, B_row)] for A_row, B_row in zip(A, B)])
+
+    # return np.array([[max(a, b) for a, b in zip(A_row, B_row)] for A_row, B_row in zip(A, B)])
     rows, cols = A.shape
-    # Koren: result = np.zeros((rows, cols), dtype=A.dtype)
-    result = np.zeros_like(A)
-    # Koren: for i in range(A.shape[0]):
-    for i in range(rows):
-        # Koren: for j in range(A.shape[1]):
-        for j in range(cols):
-            # Koren: result[i, j] = A[i, j] if A[i, j] > B[i, j] else B[i, j]
-            result[i, j] = max(A[i, j], B[i, j])
+    # result = np.zeros((rows, cols), dtype=A.dtype)
+    result = np.zeros_like(A)  # Koren: Is it a numpy vectorize operation?
+    for i in range(rows):  # for i in range(A.shape[0]):
+        for j in range(cols):  # for j in range(A.shape[1]):
+            result[i, j] = max(A[i, j], B[i, j])  # result[i, j] = A[i, j] if A[i, j] > B[i, j] else B[i, j]
     return result
 
 
@@ -31,16 +29,14 @@ def max_numba(A, B):
      np.array
          element-wise maximum between A and B
      """
+
     rows, cols = A.shape
-    # Koren: result = np.zeros((rows, cols), dtype=A.dtype) # Koren: Maybe: result = np.zeros_like(A)
-    # Koren: result = np.empty_like(A)
+    # result = np.zeros((rows, cols), dtype=A.dtype)
+    # result = np.empty_like(A)
     result = np.zeros_like(A)
-    # Koren: for i in prange(A.shape[0]):
-    for i in prange(rows):
-        # Koren: for j in range(A.shape[1]):
-        for j in prange(cols):
-            # Koren: result[i, j] = A[i, j] if A[i, j] > B[i, j] else B[i, j]
-            result[i, j] = max(A[i, j], B[i, j])
+    for i in prange(rows):  # for i in prange(A.shape[0]):
+        for j in prange(cols):  # for j in range(A.shape[1]):
+            result[i, j] = max(A[i, j], B[i, j])  # result[i, j] = A[i, j] if A[i, j] > B[i, j] else B[i, j]
     return result
 
 
@@ -55,23 +51,17 @@ def max_gpu(A, B):
     # Define grid and block size
     rows, cols = A.shape
     threads_per_block = 1000
-    # Koren: rows * cols == A.size
-    blocks_per_grid = (rows * cols + threads_per_block - 1) // threads_per_block
+    blocks_per_grid = (rows * cols + threads_per_block - 1) // threads_per_block  # rows * cols == A.size
 
     # Flatten the input matrices for 1D indexing
     A_flat = A.flatten()
     B_flat = B.flatten()
-    # Koren: C = np.zeros((n, m), dtype=A.dtype)
-    # Koren: C_flat = C.flatten()
-
-    # Koren: C_flat = np.empty_like(A_flat)
-    C_flat = np.zeros_like(A_flat)
+    C_flat = np.zeros_like(A_flat)  # C_flat = np.empty_like(A_flat)
 
     # Allocate device memory
     device_A = cuda.to_device(A_flat)
     device_B = cuda.to_device(B_flat)
-    device_C = cuda.device_array_like(C_flat)
-    # Koren: device_C = cuda.to_device(C_flat) # Koren: Maybe: C_device = cuda.device_array(A.shape, dtype=A.dtype)
+    device_C = cuda.device_array_like(C_flat)  # device_C = cuda.to_device(C_flat)
 
     # Launch kernel
     max_kernel[blocks_per_grid, threads_per_block](device_A, device_B, device_C)
@@ -87,23 +77,24 @@ def max_gpu(A, B):
 def max_kernel(A, B, C):
     """
     Koren:
-    CUDA kernel for element-wise maximum.
-
-    Parameters
-    ----------
-    A, B : cuda.device_array
-        Input matrices of the same shape.
-    C : cuda.device_array
-        Output matrix for the element-wise maximum.
+    CUDA kernel for calculating the element-wise maximum of two matrices.
+    Parameters:
+        A (cuda.device_array): First input matrix (device array).
+        B (cuda.device_array): Second input matrix (device array).
+        C (cuda.device_array): Output matrix to store the element-wise maximum.
     """
-    # Koren: tx = cuda.threadIdx.x  # Thread ID within a block
-    # Koren: bx = cuda.blockIdx.x  # Block ID within the grid
-    # Koren: bw = cuda.blockDim.x  # Number of threads per block
-    # Koren: idx = tx + bx * bw  # Compute global thread index
 
-    # Koren: idx = cuda.grid(1)  # Get thread's global index
-    # Koren: if idx < A.size:    # Ensure within bounds
-    # Koren:     C[idx] = max(A.flat[idx], B.flat[idx]) # Koren: Maybe without flat: C[idx] = max(A[idx], B[idx])
+    # Koren: The cuda.grid does not work:
+    # tx = cuda.threadIdx.x  # Thread ID within a block
+    # bx = cuda.blockIdx.x  # Block ID within the grid
+    # bw = cuda.blockDim.x  # Number of threads per block
+    # idx = tx + bx * bw  # Compute global thread index
+
+    # Koren: The index is flattened
+    # idx = cuda.grid(1)  # Get thread's global index
+
+    # if idx < A.size:  # Ensure within bounds
+    #     C[idx] = max(A.flat[idx], B.flat[idx])  # Koren: Maybe without flat: C[idx] = max(A[idx], B[idx])
 
     row, col = cuda.grid(2)
     if row < A.shape[0] and col < A.shape[1]:
