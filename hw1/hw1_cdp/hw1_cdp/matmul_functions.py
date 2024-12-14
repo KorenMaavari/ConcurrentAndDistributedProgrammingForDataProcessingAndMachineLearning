@@ -4,21 +4,85 @@ import timeit
 
 
 def matmul_transpose_trivial(X):
-    raise NotImplementedError("To be implemented")
+    rows, cols = X.shape
+    res_rows = rows
+    res_cols = rows
+    # res- the result of X(X)t.
+    res = np.zeros((res_rows, res_cols))
 
+    for i in range(rows):
+        for j in range(rows):
+            for k in range(cols):
+                # note: X[j,k] =  Xtraspose[k,j]
+                res[i, j] += X[i, k] * X[j, k]
+
+    return res
 
 @njit(parallel=True)
 def matmul_transpose_numba(X):
-    raise NotImplementedError("To be implemented")
+    rows, cols = X.shape
+    res_rows = rows
+    res_cols = rows
+    res = np.zeros((res_rows, res_cols))
+
+    for i in range(rows):
+        for j in range(rows):
+            for k in range(cols):
+                res[i, j] += X[i, k] * X[j, k]
+
+    return res
 
 
 def matmul_transpose_gpu(X):
-    raise NotImplementedError("To be implemented")
+    # Define grid and block size
+    threads_per_block = 1024
+    blocks = 1
+
+    rows, cols = X.shape
+    res_rows = rows
+    res_cols = rows
+    # res- the result of X(X)t.
+    res = np.zeros((res_rows, res_cols))
+
+    # Allocate device memory
+    device_X = cuda.to_device(X)
+    device_res = cuda.to_device(res)
+
+    # Launch kernel
+    matmul_kernel[blocks, threads_per_block](device_X, device_res)
+
+    # Copy the result back to the host
+    res = device_res.copy_to_host()
+
+    return res
 
 
 @cuda.jit
 def matmul_kernel(A, C):
-    raise NotImplementedError("To be implemented")
+    # note: we only have 1024 threads!
+    # then - each thread will handle a part of the elements in the result matrix!
+
+    threadIdx = cuda.threadIdx.x
+    total_threads = cuda.blockDim.x
+    rows, cols = A.shape
+
+    # Compute how many elements each thread should handle
+    total_elements = rows * rows  # Total number of elements in the result matrix
+    elems_per_thread = (total_elements + total_threads - 1) // total_threads  # Divide work among threads
+
+    for n in range(elems_per_thread):
+        element_id = threadIdx + n * total_threads
+        if element_id < total_elements:  # Ensure we're within bounds
+            # Map element_id to a specific (row, col) in the result matrix
+            row = element_id // rows
+            col = element_id % rows
+
+            # Compute the value of C[row, col]
+            temp = 0
+            for k in range(cols):
+                temp += A[row, k] * A[col, k]
+
+            C[row, col] = temp
 
 
 def verify_solution():

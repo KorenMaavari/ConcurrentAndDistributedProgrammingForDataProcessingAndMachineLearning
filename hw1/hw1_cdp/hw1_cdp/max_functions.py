@@ -47,30 +47,25 @@ def max_gpu(A, B):
      np.array
          element-wise maximum between A and B
      """
-
+    #A and B are given matrixes of size(1000,1000) with integer values of range [0,255]
     # Define grid and block size
-    rows, cols = A.shape
     threads_per_block = 1000
-    blocks_per_grid = (rows * cols + threads_per_block - 1) // threads_per_block  # rows * cols == A.size
+    blocks = 1000
 
-    # Flatten the input matrices for 1D indexing
-    A_flat = A.flatten()
-    B_flat = B.flatten()
-    C_flat = np.zeros_like(A_flat)  # C_flat = np.empty_like(A_flat)
+    C = np.zeros_like(A)
 
     # Allocate device memory
-    device_A = cuda.to_device(A_flat)
-    device_B = cuda.to_device(B_flat)
-    device_C = cuda.device_array_like(C_flat)  # device_C = cuda.to_device(C_flat)
+    device_A = cuda.to_device(A)
+    device_B = cuda.to_device(B)
+    device_C = cuda.to_device(C)
 
     # Launch kernel
-    max_kernel[blocks_per_grid, threads_per_block](device_A, device_B, device_C)
+    max_kernel[blocks, threads_per_block](device_A, device_B, device_C)
 
     # Copy the result back to the host
-    C_flat = device_C.copy_to_host()
+    C = device_C.copy_to_host()
 
-    # Reshape the result to the original matrix shape
-    return C_flat.reshape(rows, cols)
+    return C
 
 
 @cuda.jit
@@ -83,22 +78,14 @@ def max_kernel(A, B, C):
         B (cuda.device_array): Second input matrix (device array).
         C (cuda.device_array): Output matrix to store the element-wise maximum.
     """
+    tx = cuda.threadIdx.x  # Thread ID within a block
+    bx = cuda.blockIdx.x  # Block ID within the grid
+    # We have 1000*1000 matrix.
+    # We have total of 1000 * 1000 threads (1000 blocks, 1000 threads in a block).
+    # Meaning: blockIdx will represent the matrix row, threadIdx will represent the matrix column.
 
-    # Koren: The cuda.grid does not work:
-    # tx = cuda.threadIdx.x  # Thread ID within a block
-    # bx = cuda.blockIdx.x  # Block ID within the grid
-    # bw = cuda.blockDim.x  # Number of threads per block
-    # idx = tx + bx * bw  # Compute global thread index
-
-    # Koren: The index is flattened
-    # idx = cuda.grid(1)  # Get thread's global index
-
-    # if idx < A.size:  # Ensure within bounds
-    #     C[idx] = max(A.flat[idx], B.flat[idx])  # Koren: Maybe without flat: C[idx] = max(A[idx], B[idx])
-
-    row, col = cuda.grid(2)
-    if row < A.shape[0] and col < A.shape[1]:
-        C[row, col] = max(A[row, col], B[row, col])
+    if tx < A.shape[0] and bx < A.shape[1]:
+        C[bx, tx] = max(A[bx, tx], B[bx, tx])
 
 
 def verify_solution():
