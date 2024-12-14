@@ -69,7 +69,7 @@ def zeros_biases(sizes):
     """
 
     # return [np.zeros(size) for size in sizes[1:]]
-    return [np.zeros(sizes[i]) for i in range(1, len(sizes))]  # Koren: Maybe range(1, len(sizes) + 1)
+    return [np.zeros(sizes[i]) for i in range(0, len(sizes))]  # Koren: Maybe range(1, len(sizes) + 1)
 
 
 def create_batches(data, labels, batch_size):
