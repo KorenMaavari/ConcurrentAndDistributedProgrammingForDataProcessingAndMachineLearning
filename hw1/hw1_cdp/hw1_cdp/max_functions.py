@@ -1,6 +1,7 @@
 import numpy as np
-from numba import cuda, njit, prange, float32
+from numba import cuda, njit, prange, float32, get_num_threads
 import timeit
+import os
 
 
 def max_cpu(A, B):
@@ -71,7 +72,6 @@ def max_gpu(A, B):
 @cuda.jit
 def max_kernel(A, B, C):
     """
-    Koren:
     CUDA kernel for calculating the element-wise maximum of two matrices.
     Parameters:
         A (cuda.device_array): First input matrix (device array).
@@ -84,8 +84,7 @@ def max_kernel(A, B, C):
     # We have total of 1000 * 1000 threads (1000 blocks, 1000 threads in a block).
     # Meaning: blockIdx will represent the matrix row, threadIdx will represent the matrix column.
 
-    if tx < A.shape[0] and bx < A.shape[1]:
-        C[bx, tx] = max(A[bx, tx], B[bx, tx])
+    C[bx, tx] = max(A[bx, tx], B[bx, tx])
 
 
 def verify_solution():
@@ -120,10 +119,19 @@ def max_comparison():
 
     def timer(f):
         return min(timeit.Timer(lambda: f(A, B)).repeat(3, 20))
-
-    print('[*] CPU:', timer(max_cpu))
-    print('[*] Numba:', timer(max_numba))
-    print('[*] CUDA:', timer(max_gpu))
+    cpu_time = timer(max_cpu)
+    numba_time = timer(max_numba)
+    gpu_time = timer(max_gpu)
+    num_cores = os.getenv("SLURM_CPUS_PER_TASK")
+    print(f"===Job was executed on {num_cores} cores, number of numba threads: {get_num_threads()}===")
+    print('[*] CPU:', cpu_time)
+    print('[*] Numba:', numba_time)
+    print('[*] CUDA:', gpu_time)
+    print('speed-up between the CPU runtime to the GPU run time:', cpu_time/gpu_time)
+    print('----Time Comparison:----')
+    print('max_gpu/max_numba = ', gpu_time/numba_time)
+    print('max_gpu/max_cpu = ', gpu_time/cpu_time)
+    print('max_numba/max_cpu = ', numba_time/cpu_time)
 
 
 if __name__ == '__main__':

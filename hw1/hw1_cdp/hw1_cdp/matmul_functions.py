@@ -25,9 +25,9 @@ def matmul_transpose_numba(X):
     res_cols = rows
     res = np.zeros((res_rows, res_cols))
 
-    for i in range(rows):
-        for j in range(rows):
-            for k in range(cols):
+    for i in prange(rows):
+        for j in prange(rows):
+            for k in prange(cols):
                 res[i, j] += X[i, k] * X[j, k]
 
     return res
@@ -70,8 +70,8 @@ def matmul_kernel(A, C):
     total_elements = rows * rows  # Total number of elements in the result matrix
     elems_per_thread = (total_elements + total_threads - 1) // total_threads  # Divide work among threads
 
-    for n in range(elems_per_thread):
-        element_id = threadIdx + n * total_threads
+    for i in range(elems_per_thread):
+        element_id = threadIdx + i * total_threads
         if element_id < total_elements:  # Ensure we're within bounds
             # Map element_id to a specific (row, col) in the result matrix
             row = element_id // rows
