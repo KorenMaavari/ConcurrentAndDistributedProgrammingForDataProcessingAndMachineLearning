@@ -7,11 +7,15 @@
 # and Machine Learning" course (02360370), Winter 2024
 #
 import multiprocessing
-
+import numpy as np
+from scipy.ndimage import rotate, shift
 
 class Worker(multiprocessing.Process):
     
     def __init__(self, jobs, result, training_data, batch_size):
+        # Koren: Here there are 5 inputs, but in the homework it is with 3 inputs
+        # Koren: Here and in page 4 of the homework the "result" input is without the letter s, but in page 3 of the
+        #   homework it is "results" with the letter s
         super().__init__()
 
         ''' Initialize Worker and it's members.
@@ -29,7 +33,8 @@ class Worker(multiprocessing.Process):
         
         You should add parameters if you think you need to.
         '''
-        raise NotImplementedError("To be implemented")
+        self.jobs = jobs
+        self.result = result
 
     @staticmethod
     def rotate(image, angle):
@@ -46,7 +51,7 @@ class Worker(multiprocessing.Process):
         ------
         An numpy array of same shape
         '''
-        raise NotImplementedError("To be implemented")
+        return rotate(image.reshape(28, 28), angle, reshape=False, mode='constant', cval=0).flatten()
 
     @staticmethod
     def shift(image, dx, dy):
@@ -65,7 +70,7 @@ class Worker(multiprocessing.Process):
         ------
         An numpy array of same shape
         '''
-        raise NotImplementedError("To be implemented")
+        return shift(image.reshape(28, 28), [dy, dx], mode='constant', cval=0).flatten()
     
     @staticmethod
     def add_noise(image, noise):
@@ -84,7 +89,8 @@ class Worker(multiprocessing.Process):
         ------
         An numpy array of same shape
         '''
-        raise NotImplementedError("To be implemented")
+        actual_noise = np.random.uniform(-noise, noise, image.shape)
+        return np.clip(image + actual_noise, 0, 1)
 
     @staticmethod
     def skew(image, tilt):
@@ -101,7 +107,13 @@ class Worker(multiprocessing.Process):
         ------
         An numpy array of same shape
         '''
-        raise NotImplementedError("To be implemented")
+        skewed = np.zeros_like(image.reshape(28, 28))
+        for i in range(28):  # Iterate over each row
+            offset = int(i * tilt)  # Round to the row index
+            if 0 <= offset < 28:
+                skewed[i, offset:] = image.reshape(28, 28)[i, :28-offset]
+                # Koren: May be skewed[i, :] = image.reshape(28, 28)[i, offset:]
+        return skewed.flatten()
 
     def process_image(self, image):
         '''Apply the image process functions
@@ -116,11 +128,19 @@ class Worker(multiprocessing.Process):
         ------
         An numpy array of same shape
         '''
-        raise NotImplementedError("To be implemented")
+        image = self.rotate(image, np.random.uniform(-30, 30))
+        image = self.shift(image, np.random.randint(-5, 5), np.random.randint(-5, 5))
+        image = self.add_noise(image, 0.2)
+        image = self.skew(image, np.random.uniform(-0.3, 0.3))
+        return image
 
     def run(self):
         '''Process images from the jobs queue and add the result to the result queue.
 		Hint: you can either generate (i.e sample randomly from the training data)
 		the image batches here OR in ip_network.create_batches
         '''
-        raise NotImplementedError("To be implemented")
+        while not self.jobs.empty():
+            batch = self.jobs.get()
+            augmented_batch = [(self.process_image(image), label) for image, label in batch]
+            self.result.put(augmented_batch)  # Koren: Again, result or results?
+            self.jobs.task_done()
