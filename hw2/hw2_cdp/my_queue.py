@@ -6,12 +6,16 @@
 # "Concurrent and Distributed Programming for Data processing
 # and Machine Learning" course (02360370), Winter 2024
 #
+from multiprocessing import Pipe, Lock
+
+
 class MyQueue(object):
 
     def __init__(self):
         ''' Initialize MyQueue and it's members.
         '''
-        raise NotImplementedError("To be implemented")
+        self.parent_conn, self.child_conn = Pipe()
+        self.lock = Lock()
 
     def put(self, msg):
         '''Put the given message in queue.
@@ -21,7 +25,8 @@ class MyQueue(object):
         msg : object
             the message to put.
         '''
-        raise NotImplementedError("To be implemented")
+        with self.lock:
+            self.parent_conn.send(msg)
 
     def get(self):
         '''Get the next message from queue (FIFO)
@@ -30,7 +35,8 @@ class MyQueue(object):
         ------
         An object
         '''
-        raise NotImplementedError("To be implemented")
+        with self.lock:
+            return self.child_conn.recv()
     
     def empty(self):
         '''Get whether the queue is currently empty
@@ -39,4 +45,5 @@ class MyQueue(object):
         ------
         A boolean value
         '''
-        raise NotImplementedError("To be implemented")
+        with self.lock:
+            return not self.parent_conn.poll()  # poll = if there is any data available to be read from the pipe
