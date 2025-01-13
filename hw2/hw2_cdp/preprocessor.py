@@ -8,14 +8,11 @@
 #
 import multiprocessing
 import numpy as np
-from scipy.ndimage import rotate, shift
+from scipy.ndimage import rotate as scipy_rotate, shift as scipy_shift
 
 class Worker(multiprocessing.Process):
     
     def __init__(self, jobs, result, training_data, batch_size):
-        # Koren: Here there are 5 inputs, but in the homework it is with 3 inputs
-        # Koren: Here and in page 4 of the homework the "result" input is without the letter s, but in page 3 of the
-        #   homework it is "results" with the letter s
         super().__init__()
 
         ''' Initialize Worker and it's members.
@@ -35,6 +32,8 @@ class Worker(multiprocessing.Process):
         '''
         self.jobs = jobs
         self.result = result
+        self.training_data = training_data
+        self.batch_size = batch_size
 
     @staticmethod
     def rotate(image, angle):
@@ -51,7 +50,7 @@ class Worker(multiprocessing.Process):
         ------
         An numpy array of same shape
         '''
-        return rotate(image.reshape(28, 28), angle, reshape=False, mode='constant', cval=0).flatten()
+        return scipy_rotate(image.reshape(28, 28), angle, reshape=False, mode='constant').flatten()
 
     @staticmethod
     def shift(image, dx, dy):
@@ -70,7 +69,7 @@ class Worker(multiprocessing.Process):
         ------
         An numpy array of same shape
         '''
-        return shift(image.reshape(28, 28), [dy, dx], mode='constant', cval=0).flatten()
+        return scipy_shift(image.reshape(28, 28), [dy, dx], mode='constant').flatten()
     
     @staticmethod
     def add_noise(image, noise):
@@ -89,8 +88,9 @@ class Worker(multiprocessing.Process):
         ------
         An numpy array of same shape
         '''
-        actual_noise = np.random.uniform(-noise, noise, image.shape)
-        return np.clip(image + actual_noise, 0, 1)
+        noise_array = np.random.uniform(-noise, noise, image.shape)
+        noisy_image = image + noise_array
+        return np.clip(noisy_image, 0, 1)
 
     @staticmethod
     def skew(image, tilt):
@@ -107,13 +107,42 @@ class Worker(multiprocessing.Process):
         ------
         An numpy array of same shape
         '''
-        skewed = np.zeros_like(image.reshape(28, 28))
-        for i in range(28):  # Iterate over each row
-            offset = int(i * tilt)  # Round to the row index
-            if 0 <= offset < 28:
-                skewed[i, offset:] = image.reshape(28, 28)[i, :28-offset]
-                # Koren: May be skewed[i, :] = image.reshape(28, 28)[i, offset:]
-        return skewed.flatten()
+
+        # Create a 2x2 identity matrix as the base transformation matrix.
+        # Initially, this matrix performs no transformation.
+        skew_matrix = np.eye(2)
+
+        # Modify the [0, 1] element of the matrix to add a horizontal skew transformation.
+        # tilt determines the strength and direction of the skew.
+        skew_matrix[0, 1] = tilt
+
+        # Generate a grid of pixel coordinates for the image.
+        # np.indices((28, 28)) creates two 2D arrays:
+        # - The first array contains the row indices of the image.
+        # - The second array contains the column indices of the image.
+        # Reshape these arrays into a single array of flattened coordinates.
+        coords = np.indices((28, 28)).reshape(2, -1)
+
+        # Apply the skew transformation to the pixel coordinates using matrix multiplication.
+        # This shifts the x-coordinates based on the tilt value while keeping y-coordinates unchanged.
+        # Round the resulting coordinates to integers and convert them to int type.
+        new_coords = np.dot(skew_matrix, coords).round().astype(int)
+
+        # Ensure all transformed coordinates remain within the bounds of the image (0 to 27).
+        # This prevents accessing invalid indices outside the image dimensions.
+        new_coords[0] = np.clip(new_coords[0], 0, 27)  # Clip row indices.
+        new_coords[1] = np.clip(new_coords[1], 0, 27)  # Clip column indices.
+
+        # Create a blank (zero-initialized) canvas with the same shape as the original image.
+        # This will hold the pixel values of the skewed image.
+        skewed_image = np.zeros_like(image.reshape(28, 28))
+
+        # Map the pixel values from the original image to the new coordinates.
+        # For each transformed coordinate, place the corresponding pixel value in the skewed image.
+        skewed_image[new_coords[0], new_coords[1]] = image.reshape(28, 28)
+
+        # Flatten the 2D skewed image into a 1D array to ensure compatibility with other parts of the pipeline.
+        return skewed_image.flatten()
 
     def process_image(self, image):
         '''Apply the image process functions
@@ -128,10 +157,16 @@ class Worker(multiprocessing.Process):
         ------
         An numpy array of same shape
         '''
-        image = self.rotate(image, np.random.uniform(-30, 30))
-        image = self.shift(image, np.random.randint(-5, 5), np.random.randint(-5, 5))
-        image = self.add_noise(image, 0.2)
-        image = self.skew(image, np.random.uniform(-0.3, 0.3))
+        angle = np.random.uniform(-30, 30)
+        dx, dy = np.random.uniform(-3, 3, 2)
+        noise = np.random.uniform(0, 0.2)
+        tilt = np.random.uniform(-0.3, 0.3)
+
+        image = self.rotate(image, angle)
+        image = self.shift(image, dx, dy)
+        image = self.add_noise(image, noise)
+        image = self.skew(image, tilt)
+
         return image
 
     def run(self):
@@ -139,8 +174,13 @@ class Worker(multiprocessing.Process):
 		Hint: you can either generate (i.e sample randomly from the training data)
 		the image batches here OR in ip_network.create_batches
         '''
-        while not self.jobs.empty():
-            batch = self.jobs.get()
-            augmented_batch = [(self.process_image(image), label) for image, label in batch]
-            self.result.put(augmented_batch)  # Koren: Again, result or results?
-            self.jobs.task_done()
+        while True:
+            try:
+                image = self.jobs.get()
+                if image is None:  # Termination signal
+                    break  # Because self.jobs.empty() == True
+                augmented_image = self.process_image(image)
+                self.result.put(augmented_image)
+                self.jobs.task_done()
+            except Exception as e:
+                print(f"Error in Worker: {e}")
