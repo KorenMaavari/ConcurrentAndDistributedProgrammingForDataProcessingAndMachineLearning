@@ -6,44 +6,35 @@
 # "Concurrent and Distributed Programming for Data processing
 # and Machine Learning" course (02360370), Winter 2024
 #
-from multiprocessing import Pipe, Lock
+from multiprocessing import Pipe, Lock, Value
 
 
 class MyQueue(object):
+    """
+    A thread-safe queue for inter-process communication.
+    """
 
     def __init__(self):
-        ''' Initialize MyQueue and it's members.
-        '''
-        self.parent_conn, self.child_conn = Pipe()
+        """Initialize the queue and its synchronization mechanisms."""
+        self.reader, self.writer = Pipe(duplex=False)
         self.lock = Lock()
+        self.counter = Value('i', 0)
 
     def put(self, msg):
-        '''Put the given message in queue.
-
-        Parameters
-        ----------
-        msg : object
-            the message to put.
-        '''
+        """Add an item to the queue."""
         with self.lock:
-            self.parent_conn.send(msg)
+            self.writer.send(msg)
+            with self.counter.get_lock():
+                self.counter.value += 1
 
     def get(self):
-        '''Get the next message from queue (FIFO)
-            
-        Return
-        ------
-        An object
-        '''
-        with self.lock:
-            return self.child_conn.recv()
-    
+        """Retrieve an item from the queue."""
+        data = self.reader.recv()
+        with self.counter.get_lock():
+            self.counter.value -= 1
+        return data
+
     def empty(self):
-        '''Get whether the queue is currently empty
-            
-        Return
-        ------
-        A boolean value
-        '''
-        with self.lock:
-            return not self.parent_conn.poll()  # poll = if there is any data available to be read from the pipe
+        """Check if the queue is empty."""
+        with self.counter.get_lock():
+            return self.counter.value == 0
