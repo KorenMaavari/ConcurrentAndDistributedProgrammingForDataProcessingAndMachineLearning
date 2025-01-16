@@ -39,13 +39,13 @@ def correlation_gpu(kernel, image):
     device_ker = cuda.to_device(kernel)
     device_res = cuda.to_device(res)
 
-    threads_per_block = (16, 16)  # 16x16 threads per block
+    threads_per_block = (32, 32)  # 32X32 threads per block
     blocks_per_grid = (
         math.ceil(img_rows / threads_per_block[0]),
         math.ceil(img_cols / threads_per_block[1])
     )
 
-    # Launch kernel. Blocks = img_rows, Threads_per_block = img_cols
+    # Launch kernel.
     correlation_kernel[threads_per_block, blocks_per_grid](device_img, device_ker, device_res)
 
     # Copy the result back to the host
@@ -101,7 +101,7 @@ def correlation_kernel(image, kernel, output):
 
 
 
-@njit
+@njit(parallel=True)
 def correlation_numba(kernel, image):
     '''Correlate using numba
     Parameters
@@ -115,7 +115,7 @@ def correlation_numba(kernel, image):
     ------
     An numpy array of same shape as image
     '''
-    # first- padd the matrix with zeros so the correlation computation woll always be in bound.
+
     rows, cols = kernel.shape
     x_padd = rows // 2
     y_padd = cols // 2
@@ -124,10 +124,11 @@ def correlation_numba(kernel, image):
     img_rows, img_cols = image.shape
     result = np.zeros((img_rows, img_cols))
 
+    # iterate over the matrix cells
     for i in prange(img_rows):
         for j in prange(img_cols):
 
-            # a local variable to calculate into
+            # res- a local variable to calculate the result into
             res = 0.0
             for offset_x in prange(rows):
                 for offset_y in prange(cols):

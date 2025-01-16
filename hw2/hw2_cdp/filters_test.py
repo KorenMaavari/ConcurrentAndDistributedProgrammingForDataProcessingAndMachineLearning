@@ -2,7 +2,7 @@
 # This file is NOT for submission!
 #
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import pickle
 import timeit
 from filters import *
@@ -88,10 +88,64 @@ def corr_comparison():
     print('CUDA 7X7 kernel:', timer(edge_kernel, correlation_gpu))
     print("---------------------------------------------")
 
+def test_gpu():
+    """ Compare correlation functions run time.
+    """
+    image = get_image()
+
+    print('=========Test GPU function==========')
+    if not np.allclose(convolve2d(image, shapen_kernel, mode='same'), correlation_gpu(shapen_kernel, image)):
+        print('[-] 3X3 shapen kernel failed')
+        exit(0)
+    else:
+        print('[+] 3X3 shapen kernel passed')
+
+    if not np.allclose(convolve2d(image, blur_kernel, mode='same'), correlation_gpu(blur_kernel, image)):
+        print('[-] 5X5 blur kernel failed')
+        exit(0)
+    else:
+        print('[+] 5X5 blur kernel passed')
+
+    if not np.allclose(convolve2d(image, flipped_edge_kernel, mode='same'), correlation_gpu(edge_kernel, image)):
+        print('[-] 7X7 flipped kernel failed')
+        exit(0)
+    else:
+        print('[+] 7X7 flipped kernel passed')
+
+    print('[+] All tests passed\n')
+
+def test_numba():
+    """ Compare correlation functions run time.
+    """
+    image = get_image()
+
+    print('=========Test NUMBA function==========')
+    if not np.allclose(convolve2d(image, shapen_kernel, mode='same'), correlation_numba(shapen_kernel, image)):
+        print('[-] 3X3 shapen kernel failed')
+        exit(0)
+    else:
+        print('[+] 3X3 shapen kernel passed')
+
+    if not np.allclose(convolve2d(image, blur_kernel, mode='same'), correlation_numba(blur_kernel, image)):
+        print('[-] 5X5 blur kernel failed')
+        exit(0)
+    else:
+        print('[+] 5X5 blur kernel passed')
+
+    if not np.allclose(convolve2d(image, flipped_edge_kernel, mode='same'), correlation_numba(edge_kernel, image)):
+        print('[-] 7X7 flipped kernel failed')
+        exit(0)
+    else:
+        print('[+] 7X7 flipped kernel passed')
+
+    print('[+] All tests passed\n')
+
 
 if __name__ == '__main__':
     os.environ['NUMBAPRO_NVVM'] = '/usr/local/cuda-9.0/nvvm/lib64/libnvvm.so'
     os.environ['NUMBAPRO_LIBDEVICE'] = '/usr/local/cuda-9.0/nvvm/libdevice/'
+   # test_gpu()
+   # test_numba()
     corr_comparison()
 
     res = sobel_operator()
