@@ -6,20 +6,10 @@
 # "Concurrent and Distributed Programming for Data processing
 # and Machine Learning" course (02360370), Winter 2024
 #
-import my_queue
 import random
 import multiprocessing
 from scipy.ndimage import rotate as scipy_rotate, shift as scipy_shift
 import numpy as np
-
-
-# Markers for communication commands
-class EndProcess:
-    pass
-
-
-class GenerateBatch:
-    pass
 
 
 class Worker(multiprocessing.Process):
@@ -27,47 +17,100 @@ class Worker(multiprocessing.Process):
     A parallel data augmentation worker that processes image batches.
     """
 
-    def __init__(self, jobs: multiprocessing.Queue, results: my_queue.MyQueue, dataset, batch_size: int):
-        """
-        Initialize the Worker with a task queue, result queue, dataset, and batch size.
+    def __init__(self, jobs: multiprocessing.Queue, result: multiprocessing.Queue, batch_size: int):
+        super().__init__()
+
+        ''' Initialize Worker and it's members.
 
         Parameters
         ----------
-        jobs : Queue
-            Queue holding tasks for processing.
-        results : Queue
-            Queue where processed results are stored.
-        dataset : tuple
-            A tuple containing (images, labels).
-        batch_size : int
-            Number of images per batch.
-        """
-        super().__init__()
+        jobs: JoinableQueue
+            A jobs Queue for the worker.
+        result: Queue
+            A results Queue for the worker to put it's results in.
+		training_data: 
+			A tuple of (training images array, image lables array)
+		batch_size:
+			workers batch size of images (mini batch size)
+        
+        You should add parameters if you think you need to.
+        '''
         self.jobs = jobs
-        self.results = results
-        self.dataset = dataset
+        self.result = result
         self.batch_size = batch_size
 
     @staticmethod
     def rotate(image, angle):
-        """Rotate the image by the specified angle."""
-        return scipy_rotate(image.reshape(28, 28), angle, reshape=False).flatten()
+        '''Rotate given image to the given angle
+
+        Parameters
+        ----------
+        image : numpy array
+            An array of size 784 of pixels
+        angle : int
+            The angle to rotate the image
+
+        Return
+        ------
+        An numpy array of same shape
+        '''
+        return scipy_rotate(image.reshape(28, 28), angle, reshape=False, mode='constant').flatten()
 
     @staticmethod
     def shift(image, dx, dy):
-        """Shift the image by the given pixel offsets."""
-        return scipy_shift(image.reshape(28, 28), (dx, dy), cval=0).flatten()
+        '''Shift given image
+
+        Parameters
+        ----------
+        image : numpy array
+            An array of shape 784 of pixels
+        dx : int
+            The number of pixels to move in the x-axis
+        dy : int
+            The number of pixels to move in the y-axis
+
+        Return
+        ------
+        An numpy array of same shape
+        '''
+        return scipy_shift(image.reshape(28, 28), [dy, dx], mode='constant').flatten()
 
     @staticmethod
     def add_noise(image, noise):
-        """Add random noise within [-max_noise, max_noise] to the image."""
-        actual_noise = np.random.uniform(-noise, noise, image.shape)
-        noisy_img = np.clip(image + actual_noise, 0, 1)
-        return noisy_img
+        '''Add noise to the image
+        for each pixel a value is selected uniformly from the
+        range [-noise, noise] and added to it.
+
+        Parameters
+        ----------
+        image : numpy array
+            An array of shape 784 of pixels
+        noise : float
+            The maximum amount of noise that can be added to a pixel
+
+        Return
+        ------
+        An numpy array of same shape
+        '''
+        noise_array = np.random.uniform(-noise, noise, image.shape)
+        noisy_image = image + noise_array
+        return np.clip(noisy_image, 0, 1)
 
     @staticmethod
     def skew(image, tilt):
-        """Skew the image by a specified factor."""
+        '''Skew the image
+
+        Parameters
+        ----------
+        image : numpy array
+            An array of size 784 of pixels
+        tilt : float
+            The skew paramater
+
+        Return
+        ------
+        An numpy array of same shape
+        '''
         reshaped_img = image.reshape(28, 28)
         skewed_img = np.zeros_like(reshaped_img)
         for row in range(28):
@@ -78,7 +121,19 @@ class Worker(multiprocessing.Process):
         return skewed_img.flatten()
 
     def process_image(self, image):
-        """Perform multiple augmentations in random order."""
+        '''Apply the image process functions
+		Experiment with the random bounds for the functions to see which produces good accuracies.
+
+        Parameters
+        ----------
+        image: numpy array
+            An array of size 784 of pixels
+
+        Return
+        ------
+        An numpy array of same shape
+        '''
+        copied_image = np.copy(image)
         transformations = [
             (self.rotate, [random.randint(-5, 5)]),
             (self.shift, [random.randint(-3, 3), random.randint(-3, 3)]),
@@ -87,18 +142,17 @@ class Worker(multiprocessing.Process):
         ]
         random.shuffle(transformations)
         for func, params in transformations:
-            image = func(image, *params)
-        return image
+            copied_image = func(copied_image, *params)
+        return copied_image
 
     def run(self):
-        """Continuously process batches from the task queue."""
-        images, labels = self.dataset
-        while True:
-            task = self.jobs.get()
-            if task is EndProcess:
-                self.jobs.task_done()
-                break
-            indices = random.sample(range(len(images)), self.batch_size)
-            augmented_images = [self.process_image(images[i]) for i in indices]
-            self.results.put((augmented_images, labels[indices]))
-            self.jobs.task_done()  # Mark the task as done
+        '''Process images from the jobs queue and add the result to the result queue.
+		Hint: you can either generate (i.e sample randomly from the training data)
+		the image batches here OR in ip_network.create_batches
+        '''
+        # ToDo: maybe handle case where queue is empty
+        image = self.jobs.get()
+        # if image is None:  # it means that self.jobs.empty() == True
+        aug_image = self.process_image(image)
+        self.result.put(aug_image)
+        self.jobs.task_done()  # Mark the task as done
