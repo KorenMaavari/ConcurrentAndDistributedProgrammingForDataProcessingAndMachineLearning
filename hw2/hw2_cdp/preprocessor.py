@@ -17,7 +17,7 @@ class Worker(multiprocessing.Process):
     A parallel data augmentation worker that processes image batches.
     """
 
-    def __init__(self, jobs: multiprocessing.Queue, result: multiprocessing.Queue, batch_size: int):
+    def __init__(self, jobs, results, batch_size, training_data):
         super().__init__()
 
         ''' Initialize Worker and it's members.
@@ -35,9 +35,10 @@ class Worker(multiprocessing.Process):
         
         You should add parameters if you think you need to.
         '''
-        self.jobs = jobs
-        self.result = result
+        self.jobs = jobs #they don't have actual data inside that we'll use, we need them to manage the batch creation
+        self.results = results #we will put here all the batches we will generate
         self.batch_size = batch_size
+        self.training_data = training_data
 
     @staticmethod
     def rotate(image, angle):
@@ -135,12 +136,11 @@ class Worker(multiprocessing.Process):
         '''
         copied_image = np.copy(image)
         transformations = [
-            (self.rotate, [random.randint(-5, 5)]),
-            (self.shift, [random.randint(-3, 3), random.randint(-3, 3)]),
-            (self.add_noise, [random.uniform(0.0, 0.02)]),
+            (self.shift, [random.randint(-2, 2), random.randint(-2, 2)]),
+            (self.rotate, [random.randint(-10, 10)]),
+            (self.add_noise, [random.uniform(0.0, 0.15)]),
             (self.skew, [random.uniform(-0.1, 0.1)]),
         ]
-        random.shuffle(transformations)
         for func, params in transformations:
             copied_image = func(copied_image, *params)
         return copied_image
@@ -150,9 +150,22 @@ class Worker(multiprocessing.Process):
 		Hint: you can either generate (i.e sample randomly from the training data)
 		the image batches here OR in ip_network.create_batches
         '''
-        # ToDo: maybe handle case where queue is empty
-        image = self.jobs.get()
-        # if image is None:  # it means that self.jobs.empty() == True
-        aug_image = self.process_image(image)
-        self.result.put(aug_image)
-        self.jobs.task_done()  # Mark the task as done
+        # parallelized:
+        # 1. compute batch indices, and get the data and labels in that indices (as it was in create_batches, but now every worker
+        #     creates a batch, so it will be computed here)
+        # 2. preform augmentation.
+        # 3. put the result in the output queue
+
+        while True:
+            job = self.jobs.get()
+            if job is None:  # Poison pill
+                self.jobs.task_done()
+                break
+
+            data, labels = self.training_data
+            indexes = random.sample(range(0, data.shape[0]), self.batch_size)
+            batch_data = data[indexes]
+            batch_labels = labels[indexes]
+            aug_res = np.array([self.process_image(img) for img in batch_data])
+            self.jobs.task_done()
+            self.results.put((aug_res, batch_labels))

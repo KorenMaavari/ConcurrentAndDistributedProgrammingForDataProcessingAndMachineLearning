@@ -5,9 +5,7 @@ from collect import *
 from ip_network import *
 from time import time
 
-
 if __name__ == '__main__':
-
     # initialize training, validation and testing data
     training_data, validation_data, test_data = load_mnist()
 
@@ -16,10 +14,10 @@ if __name__ == '__main__':
 
     # initialize learning rate
     learning_rate = 0.1
-    
+
     # initialize mini batch size
     mini_batch_size = 16
-    
+
     number_of_batches = 300
 
     # initialize epoch
@@ -39,11 +37,11 @@ if __name__ == '__main__':
     # testing neural network
     accuracy = (nn.validate(test_data) / len(test_data[0])) * 100
     print("Test Accuracy: " + str(accuracy) + "%")
-    
+
     start1 = time()
     # initialize neural-net
     nn = IPNeuralNetwork(layers, learning_rate, mini_batch_size, number_of_batches, epochs)
-    
+
     # training neural network
     nn.fit(training_data, validation_data)
     stop1 = time()
@@ -52,5 +50,5 @@ if __name__ == '__main__':
     # testing neural network
     accuracy = (nn.validate(test_data) / len(test_data[0])) * 100
     print("Test Accuracy: " + str(accuracy) + "%")
-   
+
 
