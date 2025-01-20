@@ -21,18 +21,18 @@ class MyQueue(object):
         self.counter = Value('i', 0)
 
     def put(self, msg):
-        """Add an item to the queue."""
+        """Put a message into the queue safely."""
         with self.lock:
-            self.writer.send(msg)
-            with self.counter.get_lock():
-                self.counter.value += 1
+            self.writer.send(msg)  # Send the message
+        with self.counter.get_lock():
+            self.counter.value += 1  # Increment the queue length counter
 
     def get(self):
-        """Retrieve an item from the queue."""
-        data = self.reader.recv()
+        """Retrieve the next message from the queue safely."""
+        msg = self.reader.recv()  # Receive the message
         with self.counter.get_lock():
-            self.counter.value -= 1
-        return data
+            self.counter.value -= 1  # Decrement the queue length counter
+        return msg
 
     def empty(self):
         """Check if the queue is empty."""

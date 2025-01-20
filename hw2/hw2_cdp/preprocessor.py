@@ -27,15 +27,15 @@ class Worker(multiprocessing.Process):
     A parallel data augmentation worker that processes image batches.
     """
 
-    def __init__(self, task_queue: multiprocessing.Queue, output_queue: my_queue.MyQueue, dataset, batch_size: int):
+    def __init__(self, jobs: multiprocessing.Queue, results: my_queue.MyQueue, dataset, batch_size: int):
         """
         Initialize the Worker with a task queue, result queue, dataset, and batch size.
 
         Parameters
         ----------
-        task_queue : Queue
+        jobs : Queue
             Queue holding tasks for processing.
-        output_queue : Queue
+        results : Queue
             Queue where processed results are stored.
         dataset : tuple
             A tuple containing (images, labels).
@@ -43,8 +43,8 @@ class Worker(multiprocessing.Process):
             Number of images per batch.
         """
         super().__init__()
-        self.task_queue = task_queue
-        self.output_queue = output_queue
+        self.jobs = jobs
+        self.results = results
         self.dataset = dataset
         self.batch_size = batch_size
 
@@ -94,9 +94,11 @@ class Worker(multiprocessing.Process):
         """Continuously process batches from the task queue."""
         images, labels = self.dataset
         while True:
-            task = self.task_queue.get()
+            task = self.jobs.get()
             if task is EndProcess:
+                self.jobs.task_done()
                 break
             indices = random.sample(range(len(images)), self.batch_size)
             augmented_images = [self.process_image(images[i]) for i in indices]
-            self.output_queue.put((augmented_images, labels[indices]))
+            self.results.put((augmented_images, labels[indices]))
+            self.jobs.task_done()  # Mark the task as done
