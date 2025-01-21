@@ -6,35 +6,55 @@
 # "Concurrent and Distributed Programming for Data processing
 # and Machine Learning" course (02360370), Winter 2024
 #
-from multiprocessing import Pipe, Lock, Value
+from multiprocessing import Pipe, Lock
 
 
 class MyQueue(object):
-    """
-    A thread-safe queue for inter-process communication.
-    """
 
     def __init__(self):
-        """Initialize the queue and its synchronization mechanisms."""
-        self.reader, self.writer = Pipe(duplex=False)
-        self.lock = Lock()
-        self.counter = Value('i', 0)
+        """ Initialize MyQueue and it's members.
+        """
+        """
+        Initialize MyQueue with a lock for synchronization and a pipe for communication.
+
+        Attributes:
+        ----------
+        lock : Lock
+            Ensures thread-safe operations for multiple writers.
+        pipe_reader : Connection
+            End of the pipe for reading messages.
+        pipe_writer : Connection
+            End of the pipe for writing messages.
+        """
+        self.lock = Lock()  # Synchronize writers
+        # duplex=False  ->  not bidirectional communication
+        self.pipe_reader, self.pipe_writer = Pipe(duplex=False)  # Single reader, multiple writers
 
     def put(self, msg):
-        """Put a message into the queue safely."""
-        with self.lock:
-            self.writer.send(msg)  # Send the message
-        with self.counter.get_lock():
-            self.counter.value += 1  # Increment the queue length counter
+        """Put the given message in queue.
+
+        Parameters
+        ----------
+        msg : object
+            the message to put.
+        """
+        with self.lock:  # Lock ensures only one writer can send a message at a time
+            self.pipe_writer.send(msg)
 
     def get(self):
-        """Retrieve the next message from the queue safely."""
-        msg = self.reader.recv()  # Receive the message
-        with self.counter.get_lock():
-            self.counter.value -= 1  # Decrement the queue length counter
-        return msg
+        """Get the next message from queue (FIFO)
+
+        Return
+        ------
+        An object
+        """
+        return self.pipe_reader.recv()  # Single reader, so no lock is needed
 
     def empty(self):
-        """Check if the queue is empty."""
-        with self.counter.get_lock():
-            return self.counter.value == 0
+        """Get whether the queue is currently empty
+
+        Return
+        ------
+        A boolean value
+        """
+        return not self.pipe_reader.poll()  # Check for data availability without blocking
