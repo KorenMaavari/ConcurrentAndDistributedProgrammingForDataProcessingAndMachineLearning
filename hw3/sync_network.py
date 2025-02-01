@@ -24,12 +24,19 @@ class SynchronicNeuralNetwork(NeuralNetwork):
             for x, y in mini_batches:
                 # doing props
                 self.forward_prop(x)
-                ma_nabla_b, ma_nabla_w = self.back_prop(y)
+                my_nabla_b, my_nabla_w = self.back_prop(y)
 
                 # summing all ma_nabla_b and ma_nabla_w to nabla_w and nabla_b
-                nabla_w = []
-                nabla_b = []
                 # TODO: add your code
+                # first - allocate buffers
+                nabla_w = [np.zeros_like(i) for i in my_nabla_w]
+                nabla_b = [np.zeros_like(i) for i in my_nabla_b]
+
+                for src, dst in zip (my_nabla_w, nabla_w):
+                    ringallreduce(src, dst, comm, op=MPI.SUM)
+
+                for src, dst in zip(my_nabla_b, nabla_b):
+                    ringallreduce(src, dst, comm, op=MPI.SUM)
 
                 # calculate work
                 self.weights = [w - self.eta * dw for w, dw in zip(self.weights, nabla_w)]

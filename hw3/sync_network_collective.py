@@ -1,3 +1,5 @@
+import numpy as np
+
 from network import *
 from my_ring_allreduce import *
 import mpi4py
@@ -24,12 +26,27 @@ class SynchronicNeuralNetwork(NeuralNetwork):
             for x, y in mini_batches:
                 # doing props
                 self.forward_prop(x)
-                ma_nabla_b, ma_nabla_w = self.back_prop(y)
+                my_nabla_b, my_nabla_w = self.back_prop(y) # my_nabla is a list of numpy array of length NN_num_layers!
 
-                # summing all ma_nabla_b and ma_nabla_w to nabla_w and nabla_b
-                nabla_w = []
-                nabla_b = []
+                # summing all my_nabla_b and my_nabla_w to nabla_w and nabla_b
                 # TODO: add your code
+                # use global computation + all reduce: we want to access the reduced data on all processors
+
+                # first - allocate buffers
+                nabla_w = [np.zeros_like(i) for i in my_nabla_w]
+                nabla_b = [np.zeros_like(i) for i in my_nabla_b]
+
+                # now- use AllReduce!
+                # notice: The sum: nabla[pos, idx] = sum_from_all(my_nabla[pos, idx])
+                for src, dst in zip (my_nabla_w, nabla_w):
+                    comm.Allreduce(src, dst, op=MPI.SUM)
+
+                for src, dst in zip(my_nabla_b, nabla_b):
+                    comm.Allreduce(src, dst, op=MPI.SUM)
+
+                # ToDo: average?
+
+                # end of our code
 
                 # calculate work
                 self.weights = [w - self.eta * dw for w, dw in zip(self.weights, nabla_w)]

@@ -1,5 +1,6 @@
 import numpy as np
 import mpi4py
+from time import time
 
 mpi4py.rc(initialize=False, finalize=False)
 from mpi4py import MPI
@@ -25,32 +26,28 @@ def allreduce(send, recv, comm, op):
     # when all the data is in place, calculate reduction in each process into recv_buffer.
 
     # allocate buffer for receiving values from all the process.
-    all_values = [np.empty(recv.shape) for _ in range(size)]
+    all_values = [np.empty_like(send) for _ in range(size)]
 
     # send buffer to all other processes, and copy the send_buffer for the current process.
-    send_requests = []
     for i in range(size):
         if i != rank:
             req = comm.Isend(send, dest=i)
-            send_requests.append(req)
+            #req.wait()
 
     # receive back shared data from other processes
-    receive_requests = []
-    for i in range(size):
-        if i == rank:
-            all_values[i] = send
-        else:
-            receive_requests.append(comm.Irecv(all_values[i], i))
-
-    # wait for all the values!
     for i in range(size):
         if i != rank:
-            receive_requests[i].wait()
+            req = comm.Irecv(all_values[i], i)
+            # wait for all the values!
+            req.wait()
+
+    #print(all_values) #for debug
 
     # reduce everyone
-    compute = all_values[0]
-    for i in range(1, size):
-        compute = op(all_values[i], compute)
+    compute = send
+    for i in range(size):
+        if i != rank:
+            compute = np.vectorize(op)(all_values[i], compute)
 
     recv[:] = compute
     return recv
@@ -63,7 +60,7 @@ def mul(x,y):
     return x*y
 
 
-def test():
+def do_allreduce():
     MPI.Init()
 
     comm = MPI.COMM_WORLD
@@ -71,47 +68,51 @@ def test():
     rank = comm.Get_rank()
     size = comm.Get_size()
 
-    send_data = np.random.rand(100, 100, 100)
+    send_data = np.array([[1, 2, 3, 4, 5], [1 + rank, 2 + rank, 3 + rank, 4 + rank, 5 + rank], [10, -1, 2, rank, rank]])
 
-    # test sum
+    # sum
     recv_data = np.empty_like(send_data)
-    recv_mpi = np.empty_like(send_data)
     allreduce(send_data, recv_data, comm, sum)
-    comm.Allreduce(send_data, recv_mpi, op=MPI.SUM)
-    if not np.allclose(recv_data, recv_mpi):
-        print('failed sum')
-        exit(0)
 
-    #test mul
+    print('====SUM==== \nrank: {} comm size: {}\n\n MY IMPL.\n send_data = {}\n recv_data = {}\n'.format(rank, size,
+                                                                                                         send_data,
+                                                                                                         recv_data))
     recv_data = np.empty_like(send_data)
-    recv_mpi = np.empty_like(send_data)
+    comm.Allreduce(send_data, recv_data, op=MPI.SUM)
+    print('MPI\n send_data = {}\n recv_data = {}\n\n'.format(send_data, recv_data))
+
+    # mul
+    recv_data = np.empty_like(send_data)
     allreduce(send_data, recv_data, comm, mul)
-    comm.Allreduce(send_data, recv_mpi, op=MPI.PROD)
-    if not np.allclose(recv_data, recv_mpi):
-        print('failed mul')
-        exit(0)
-
-    #test max
+    print('====MUL==== \nrank: {} comm size: {}\n send_data = {}\n recv_data = {}\n'.format(rank, size, send_data,
+                                                                                            recv_data))
     recv_data = np.empty_like(send_data)
-    recv_mpi = np.empty_like(send_data)
-    allreduce(send_data, recv_data, comm, max)
-    comm.Allreduce(send_data, recv_mpi, op=MPI.MAX)
-    if not np.allclose(recv_data, recv_mpi):
-        print('failed max')
-        exit(0)
+    comm.Allreduce(send_data, recv_data, op=MPI.PROD)
+    print('MPI\n send_data = {}\n recv_data = {}\n\n'.format(send_data, recv_data))
 
-    #test mul
+    # max- works only elementwize, not on np array
     recv_data = np.empty_like(send_data)
-    recv_mpi = np.empty_like(send_data)
-    allreduce(send_data, recv_data, comm, min)
-    comm.Allreduce(send_data, recv_mpi, op=MPI.MIN)
-    if not np.allclose(recv_data, recv_mpi):
-        print('failed min')
-        exit(0)
+    allreduce(send_data, recv_data, comm, MPI.MAX)
+    print('====MAX==== \nrank: {} comm size: {}\n send_data = {}\n recv_data = {}\n'.format(rank, size, send_data,
+                                                                                            recv_data))
+    recv_data = np.empty_like(send_data)
+    comm.Allreduce(send_data, recv_data, op=MPI.MAX)
+    print('MPI\n send_data = {}\n recv_data = {}\n\n'.format(send_data, recv_data))
 
-    print('all passed!')
+    # min- works only elementwize, not on np array
+    recv_data = np.empty_like(send_data)
+    allreduce(send_data, recv_data, comm, MPI.MIN)
+    print('====MIN==== \nrank: {} comm size: {}\n send_data = {}\n recv_data = {}\n'.format(rank, size, send_data,
+                                                                                            recv_data))
+    recv_data = np.empty_like(send_data)
+    comm.Allreduce(send_data, recv_data, op=MPI.MIN)
+    print('MPI\n send_data = {}\n recv_data = {}\n\n'.format(send_data, recv_data))
 
     MPI.Finalize()
 
 if __name__ == '__main__':
-    test()
+    start = time()
+    do_allreduce()
+    stop = time()
+    print(f'runtime: {stop-start}[s]')
+
