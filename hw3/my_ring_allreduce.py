@@ -47,7 +47,7 @@ def ringallreduce(send, recv, comm, op):
         # receive the data
         recv_idx = (rank - 1 - i) % num_processes # the index of the chunk to receive message and work with
         recv_req = comm.Irecv(recv_buffers[recv_idx], recv_from)
-        recv_req.wait()
+        recv_req.Wait()
 
         # preform operation
         if recv_buffers[recv_idx].size != 0:
@@ -64,7 +64,7 @@ def ringallreduce(send, recv, comm, op):
         # receive the data
         recv_idx = (rank - i) % num_processes  # the index of the chunk to receive message and work with
         recv_req = comm.Irecv(recv_buffers[recv_idx], recv_from)
-        recv_req.wait()
+        recv_req.Wait()
 
         # save result
         if recv_buffers[recv_idx].size != 0:

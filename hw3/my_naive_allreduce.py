@@ -32,14 +32,13 @@ def allreduce(send, recv, comm, op):
     for i in range(size):
         if i != rank:
             req = comm.Isend(send, dest=i)
-            #req.wait()
 
     # receive back shared data from other processes
     for i in range(size):
         if i != rank:
             req = comm.Irecv(all_values[i], i)
             # wait for all the values!
-            req.wait()
+            req.Wait()
 
     #print(all_values) #for debug
 
