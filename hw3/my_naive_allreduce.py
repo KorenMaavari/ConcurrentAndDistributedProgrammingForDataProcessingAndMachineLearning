@@ -21,30 +21,27 @@ def allreduce(send, recv, comm, op):
     size = comm.Get_size()
 
     # we want to collect data from all the processes.
-    # so, we will send from each process it's send_buffer to all the other processes.
+    # so, we will send from each process it's send_buffer to all the processes.
     # then, we will wait for all the data to be received.
     # when all the data is in place, calculate reduction in each process into recv_buffer.
 
     # allocate buffer for receiving values from all the process.
     all_values = [np.empty_like(send) for _ in range(size)]
 
-    # send buffer to all other processes, and copy the send_buffer for the current process.
+    # send buffer to all processes, and copy the send_buffer for the current process.
     for i in range(size):
-        if i != rank:
-            req = comm.Isend(send, dest=i)
+        req = comm.Isend(send, dest=i)
 
-    # receive back shared data from other processes
+    # receive back shared data from processes
     for i in range(size):
-        if i != rank:
-            req = comm.Irecv(all_values[i], i)
-            # wait for all the values!
-            req.Wait()
+        req = comm.Irecv(all_values[i], i)
+        # wait for all the values!
+        req.Wait()
 
     # reduce everyone
-    compute = send
-    for i in range(size):
-        if i != rank:
-            compute = np.vectorize(op)(all_values[i], compute)
+    compute = all_values[0]
+    for i in range(1, size):
+        compute = np.vectorize(op)(all_values[i], compute)
 
     recv[:] = compute
     return recv

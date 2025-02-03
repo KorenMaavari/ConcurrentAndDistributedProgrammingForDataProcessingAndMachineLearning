@@ -30,7 +30,7 @@ def ringallreduce(send, recv, comm, op):
     chunks = np.array_split(send, num_processes)
 
     # prepare for each process buffer for receiving messages
-    recv_buffers = [np.empty_like(chunk) for chunk in chunks]
+    recv_buffers = np.array_split(recv, num_processes)
 
     # the processes to communicate with
     send_to = (rank + 1) % num_processes
@@ -51,7 +51,6 @@ def ringallreduce(send, recv, comm, op):
 
         # preform operation
         if recv_buffers[recv_idx].size != 0:
-            #chunks[recv_idx] = op(chunks[recv_idx], recv_buffers[recv_idx])
             chunks[recv_idx] = np.vectorize(op)(chunks[recv_idx], recv_buffers[recv_idx])
 
     # n-1 iterations for distribution
