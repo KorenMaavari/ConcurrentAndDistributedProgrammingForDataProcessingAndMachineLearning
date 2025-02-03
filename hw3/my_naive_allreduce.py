@@ -40,8 +40,6 @@ def allreduce(send, recv, comm, op):
             # wait for all the values!
             req.Wait()
 
-    #print(all_values) #for debug
-
     # reduce everyone
     compute = send
     for i in range(size):
